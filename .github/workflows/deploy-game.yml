@@ -1,0 +1,96 @@
+name: Publier le jeu sur GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.zip'
+      - '.github/workflows/deploy-game.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Préparer le dossier du site
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf _site
+          mkdir -p _site
+
+          zip_file="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
+          if [ -z "$zip_file" ]; then
+            echo "Aucun fichier ZIP trouvé à la racine du dépôt." >&2
+            exit 1
+          fi
+          echo "Archive utilisée : $zip_file"
+
+          python3 - "$zip_file" <<'PY'
+          import pathlib
+          import sys
+          import zipfile
+
+          archive = pathlib.Path(sys.argv[1])
+          destination = pathlib.Path("_site").resolve()
+
+          with zipfile.ZipFile(archive) as zf:
+              for member in zf.infolist():
+                  target = (destination / member.filename).resolve()
+                  if target != destination and destination not in target.parents:
+                      raise RuntimeError(f"Chemin dangereux dans l'archive : {member.filename}")
+                  zf.extract(member, destination)
+          PY
+
+          if [ ! -f _site/index.html ]; then
+            entries=()
+            shopt -s nullglob dotglob
+            for item in _site/*; do
+              entries+=("$item")
+            done
+
+            if [ "${#entries[@]}" -eq 1 ] && [ -d "${entries[0]}" ] && [ -f "${entries[0]}/index.html" ]; then
+              tmp_dir="_site/.flattened"
+              mkdir -p "$tmp_dir"
+              cp -a "${entries[0]}/." "$tmp_dir"/
+              rm -rf _site/*
+              rm -rf _site/.[!.]* _site/..?* 2>/dev/null || true
+              cp -a "$tmp_dir"/. _site/
+              rm -rf "$tmp_dir"
+            fi
+          fi
+
+          if [ ! -f _site/index.html ]; then
+            echo "Attention : aucun index.html n'a été trouvé dans le ZIP."
+          fi
+
+      - name: Configurer GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Préparer l’artifact Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Publier sur GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
