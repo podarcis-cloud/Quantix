@@ -59,6 +59,9 @@ jobs:
           echo "✓ Racine du site : $src"
           cp -a "$src"/. _site/
 
+          # AJOUT : copie les packs de samples déposés dans le dépôt (ignoré s'il n'y a pas de dossier packs/)
+          if [ -d packs ]; then mkdir -p _site/assets/bank && cp -a packs/. _site/assets/bank/; fi
+
           rm -rf _site/.git _site/.github _site/node_modules _site/.gitignore
           touch _site/.nojekyll
 
@@ -78,3 +81,5 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  
