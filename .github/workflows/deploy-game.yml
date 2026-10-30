@@ -59,8 +59,10 @@ jobs:
           echo "✓ Racine du site : $src"
           cp -a "$src"/. _site/
 
-          # AJOUT : copie les packs de samples déposés dans le dépôt (ignoré s'il n'y a pas de dossier packs/)
-          if [ -d packs ]; then mkdir -p _site/assets/bank && cp -a packs/. _site/assets/bank/; fi
+          # Packs de sons : fichiers pack-*.bin à la racine du dépôt (ou dans packs/), ignorés s'il n'y en a pas
+          mkdir -p _site/assets/bank
+          cp -a pack-*.bin _site/assets/bank/ 2>/dev/null || true
+          if [ -d packs ]; then cp -a packs/. _site/assets/bank/; fi
 
           rm -rf _site/.git _site/.github _site/node_modules _site/.gitignore
           touch _site/.nojekyll
@@ -71,7 +73,7 @@ jobs:
           fi
 
           echo "✓ Contenu prêt pour publication"
-          ls -lh _site/index.html
+          ls -lh _site/index.html _site/assets/bank
 
       - uses: actions/configure-pages@v5
 
@@ -81,5 +83,3 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
-
-  
