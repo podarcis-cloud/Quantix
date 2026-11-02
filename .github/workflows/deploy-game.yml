@@ -56,6 +56,10 @@ jobs:
           cp -a "$src"/. _site/
           # copie les packs de samples déposés dans le dépôt (ignoré s'il n'y a pas de dossier packs/)
           if [ -d packs ]; then mkdir -p _site/assets/bank && cp -a packs/. _site/assets/bank/; fi
+          # R380 : packs déposés à la racine du dépôt (pack-*.bin) : copiés aussi vers assets/bank/
+          for p in pack-*.bin; do
+            if [ -f "$p" ]; then mkdir -p _site/assets/bank && cp "$p" _site/assets/bank/ && echo "✓ Pack publié : $p"; fi
+          done
           # R365 : banques externes déposées à la racine du dépôt, copiées telles quelles à la racine du site
           for b in KIT_bank.zip FX_bank.zip; do
             if [ -f "$b" ]; then cp "$b" "_site/$b"; echo "✓ Banque publiée : $b"; fi
