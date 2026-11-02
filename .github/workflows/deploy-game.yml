@@ -27,19 +27,17 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf _site && mkdir -p _site
-
           zipf=""
           if [ -f QUANTIX-SITE.zip ]; then
             zipf=QUANTIX-SITE.zip
           else
-            zipf=$(ls *.zip 2>/dev/null | sort -V | tail -1 || true)
+            # R365 : les banques (KIT_bank.zip, FX_bank.zip) ne sont jamais prises pour le site
+            zipf=$(ls *.zip 2>/dev/null | grep -v -E '^(KIT|FX)_bank\.zip$' | sort -V | tail -1 || true)
           fi
-
           pick_root () {
             find "$1" -name index.html -not -path '*/node_modules/*' -not -path '*/docs/*' -not -path './_site/*' \
               | awk -F/ '{print NF, $0}' | sort -n | head -1 | cut -d' ' -f2-
           }
-
           if [ -n "$zipf" ]; then
             echo "✓ Archive détectée : $zipf"
             tmp=$(mktemp -d)
@@ -49,32 +47,27 @@ jobs:
             echo "✓ Pas d'archive : publication des fichiers du dépôt"
             idx=$(pick_root .)
           fi
-
           if [ -z "${idx:-}" ]; then
             echo "❌ ERREUR : aucun index.html trouvé dans l'archive ou le dépôt"
             exit 1
           fi
-
           src=$(dirname "$idx")
           echo "✓ Racine du site : $src"
           cp -a "$src"/. _site/
-
-          # Packs de sons : fichiers pack-*.bin à la racine du dépôt (ou dans packs/), ignorés s'il n'y en a pas
-          mkdir -p _site/assets/bank
-          cp -a pack-*.bin _site/assets/bank/ 2>/dev/null || true
-          if [ -d packs ]; then cp -a packs/. _site/assets/bank/; fi
-
+          # copie les packs de samples déposés dans le dépôt (ignoré s'il n'y a pas de dossier packs/)
+          if [ -d packs ]; then mkdir -p _site/assets/bank && cp -a packs/. _site/assets/bank/; fi
+          # R365 : banques externes déposées à la racine du dépôt, copiées telles quelles à la racine du site
+          for b in KIT_bank.zip FX_bank.zip; do
+            if [ -f "$b" ]; then cp "$b" "_site/$b"; echo "✓ Banque publiée : $b"; fi
+          done
           rm -rf _site/.git _site/.github _site/node_modules _site/.gitignore
           touch _site/.nojekyll
-
           if [ ! -f _site/index.html ]; then
             echo "❌ ERREUR : index.html manquant après préparation"
             exit 1
           fi
-
           echo "✓ Contenu prêt pour publication"
-          ls -lh _site/index.html _site/assets/bank
-
+          ls -lh _site/index.html
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
