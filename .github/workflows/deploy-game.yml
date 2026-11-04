@@ -31,15 +31,15 @@ jobs:
           if [ -f QUANTIX-SITE.zip ]; then
             zipf=QUANTIX-SITE.zip
           else
-            # R365 : les banques (KIT_bank.zip, FX_bank.zip) ne sont jamais prises pour le site
-            zipf=$(ls *.zip 2>/dev/null | grep -v -E '^(KIT|FX)_bank\.zip$' | sort -V | tail -1 || true)
+            # R365/R404 : les banques (KIT_bank.zip, FX_bank.zip) et QUANTONE.zip ne sont jamais prises pour le site du jeu
+            zipf=$(ls *.zip 2>/dev/null | grep -v -E '^(KIT_bank|FX_bank|QUANTONE)\.zip$' | sort -V | tail -1 || true)
           fi
           pick_root () {
             find "$1" -name index.html -not -path '*/node_modules/*' -not -path '*/docs/*' -not -path './_site/*' \
               | awk -F/ '{print NF, $0}' | sort -n | head -1 | cut -d' ' -f2-
           }
           if [ -n "$zipf" ]; then
-            echo "✓ Archive détectée : $zipf"
+            echo "✓ Archive du jeu détectée : $zipf"
             tmp=$(mktemp -d)
             unzip -q "$zipf" -d "$tmp"
             idx=$(pick_root "$tmp")
@@ -54,6 +54,25 @@ jobs:
           src=$(dirname "$idx")
           echo "✓ Racine du site : $src"
           cp -a "$src"/. _site/
+          # R404 : Quantone et Track (studio/ + tools/) viennent d'une seconde archive, copiée PAR-DESSUS le jeu
+          if [ -f QUANTONE.zip ]; then
+            tmpq=$(mktemp -d)
+            unzip -q QUANTONE.zip -d "$tmpq"
+            qi=$(find "$tmpq" -path '*/studio/quantone.html' | awk -F/ '{print NF, $0}' | sort -n | head -1 | cut -d' ' -f2-)
+            if [ -n "${qi:-}" ]; then
+              qsrc=$(dirname "$(dirname "$qi")")
+              cp -a "$qsrc"/. _site/
+              echo "✓ Quantone publié : QUANTONE.zip"
+            else
+              echo "❌ ERREUR : studio/quantone.html introuvable dans QUANTONE.zip"
+              exit 1
+            fi
+          else
+            echo "ℹ Pas de QUANTONE.zip : Quantone vient de l'archive du jeu (ancien format) si elle en contient"
+          fi
+          if [ ! -f _site/studio/quantone.html ]; then
+            echo "⚠ studio/quantone.html absent : Quantone affichera 404 (dépose QUANTONE.zip à la racine du dépôt)"
+          fi
           # copie les packs de samples déposés dans le dépôt (ignoré s'il n'y a pas de dossier packs/)
           if [ -d packs ]; then mkdir -p _site/assets/bank && cp -a packs/. _site/assets/bank/; fi
           # R380 : packs déposés à la racine du dépôt (pack-*.bin) : copiés aussi vers assets/bank/
